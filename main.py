@@ -1,15 +1,20 @@
-# 9/02/2025
-# TALLER FOURIER
-# SANTIAGO MESA
-# REDES Y TELECOMUNICACIONES
+# TALLER FOURIER - Redes y Telecomunicaciones
+# Autor: Santiago Mesa
 #
-# Este programa genera una serie de Fourier para una señal digital de 8 bits
-# utilizando la tasa de datos y el ancho de banda proporcionados por el usuario.
-# La señal se descompone en armónicos y se visualiza en una gráfica 3D interactiva,
-# así como en una gráfica de la señal reconstruida.
+# Este programa calcula la serie de Fourier de una señal digital de 8 bits.
+# Se basa en la tasa de datos y el ancho de banda proporcionados por el usuario.
+#
+# **Proceso Matemático:**
+# 1. Se calcula la frecuencia fundamental (primer armónico) a partir de la tasa de datos.
+# 2. Se determina el número de armónicos permitidos según el ancho de banda.
+# 3. Se calculan los coeficientes de Fourier a_n y b_n con base en la señal de entrada.
+# 4. Se calcula la amplitud Cn y el ángulo de desfase para cada armónico.
+# 5. Se genera la señal reconstruida sumando los armónicos.
+# 6. Se visualizan los armónicos y la señal reconstruida en gráficas 2D y 3D.
 
 import matplotlib
-matplotlib.use('TkAgg')  # Habilita backend interactivo
+
+matplotlib.use('TkAgg')  # Habilita backend interactivo para que la gráfica se abra en una nueva ventana
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
@@ -19,60 +24,69 @@ from tkinter import simpledialog
 
 def mostrar_info():
     """
-    Muestra por pantalla la información del programa.
+    Muestra información general del taller.
     """
     print("\n============================")
-    print("9/02/2025")
     print("TALLER FOURIER")
     print("SANTIAGO MESA")
     print("REDES Y TELECOMUNICACIONES")
     print("============================\n")
 
 
+def calcular_coeficientes(senal):
+    """
+    Calcula los coeficientes de Fourier a_n y b_n para la señal de 8 bits.
+    """
+    N = len(senal)
+    a_n = np.zeros(N)
+    b_n = np.zeros(N)
+
+    for n in range(1, N + 1):
+        for k in range(N):
+            bit = 1 if senal[k] == '1' else -1
+            a_n[n - 1] += bit * np.cos(2 * np.pi * n * k / N)
+            b_n[n - 1] += bit * np.sin(2 * np.pi * n * k / N)
+        a_n[n - 1] *= (2 / N)
+        b_n[n - 1] *= (2 / N)
+
+    return a_n, b_n
+
+
 def serie_fourier(tasa_datos, ancho_banda, senal):
     """
-    Calcula y grafica la serie de Fourier para una señal digital.
+    Genera la serie de Fourier para la señal de entrada y la visualiza.
     """
     mostrar_info()
     print(f"Tasa de datos: {tasa_datos} bps")
     print(f"Ancho de banda: {ancho_banda} Hz")
     print(f"Señal de entrada: {senal}\n")
 
-    periodo = 1 / tasa_datos  # Periodo de la señal
-    frecuencia_fundamental = 1 / periodo  # Frecuencia fundamental (primer armónico)
-    num_armonicos = int(ancho_banda // frecuencia_fundamental)  # Número de armónicos permitidos
+    periodo = 1 / tasa_datos
+    frecuencia_fundamental = 1 / periodo
+    num_armonicos = min(len(senal), int(ancho_banda // frecuencia_fundamental))
 
-    tiempo = np.linspace(0, periodo, 1000)  # Vector de tiempo para graficar
-    senal_reconstruida = np.zeros_like(tiempo)  # Inicialización de la señal reconstruida
+    tiempo = np.linspace(0, periodo, 1000)
+    senal_reconstruida = np.zeros_like(tiempo)
+    a_n, b_n = calcular_coeficientes(senal)
 
-    # Configuración de la figura 3D
     fig = plt.figure(figsize=(12, 6))
     ax = fig.add_subplot(111, projection='3d')
-    ax.view_init(elev=30, azim=45)  # Ángulo de vista inicial
+    ax.view_init(elev=30, azim=45)
 
     for n in range(1, num_armonicos + 1):
-        coef_an = 2 / np.pi * np.sin(n * np.pi / 2)  # Coeficiente senoide
-        coef_bn = 0  # Coeficiente cosenoide (0 para señales cuadradas)
-        amplitud_cn = np.sqrt(coef_an ** 2 + coef_bn ** 2)  # Amplitud del armónico
-        fase = np.arctan2(coef_bn, coef_an)  # Fase del armónico
-
-        armonico = amplitud_cn * np.sin(2 * np.pi * n * frecuencia_fundamental * tiempo + fase)  # Cálculo del armónico
-        senal_reconstruida += armonico  # Suma de los armónicos
+        Cn = np.sqrt(a_n[n - 1] ** 2 + b_n[n - 1] ** 2)
+        fase = np.arctan2(b_n[n - 1], a_n[n - 1])
+        armonico = Cn * np.sin(2 * np.pi * n * frecuencia_fundamental * tiempo + fase)
+        senal_reconstruida += armonico
         ax.plot(tiempo, [n] * len(tiempo), armonico, linestyle='dashed', alpha=0.6, label=f'Armónico {n}')
 
-    # Configuración de la gráfica 3D
     ax.set_title("Armónicos de la señal en 3D")
     ax.set_xlabel("Tiempo (s)")
     ax.set_ylabel("Número de armónico")
     ax.set_zlabel("Amplitud")
     ax.legend()
+    plt.show(block=False)  # Abre la gráfica en una nueva ventana y permite interacción
 
-    # Mostrar la gráfica interactiva
-    plt.ion()
-    plt.show()
-    plt.ioff()
-
-    # Gráfica de la señal reconstruida
     plt.figure(figsize=(12, 6))
     plt.plot(tiempo, senal_reconstruida, label='Suma de armónicos', color='black')
     plt.title("Señal reconstruida")
@@ -86,31 +100,20 @@ def serie_fourier(tasa_datos, ancho_banda, senal):
 def obtener_entrada_usuario():
     """
     Solicita al usuario los parámetros de entrada a través de una interfaz gráfica.
-    Ofrece tres ejemplos predefinidos para quienes no sepan qué valores ingresar.
     """
     root = tk.Tk()
-    root.withdraw()  # Oculta la ventana principal de Tkinter
-
-    opciones = [
-        (100, 1000, "10101010"),
-        (1000, 5000, "11001100"),
-        (5000, 10000, "11110000")
-    ]
-
+    root.withdraw()
+    opciones = [(100, 1000, "10101010"), (1000, 5000, "11001100"), (5000, 10000, "11110000")]
     opcion = simpledialog.askinteger("Entrada",
                                      "Seleccione una opción:\n1: 100 bps, 1000 Hz, 10101010\n2: 1000 bps, 5000 Hz, 11001100\n3: 5000 bps, 10000 Hz, 11110000\n4: Ingresar valores manualmente",
                                      minvalue=1, maxvalue=4)
-
     if opcion in [1, 2, 3]:
         tasa_datos, ancho_banda, senal = opciones[opcion - 1]
     else:
         tasa_datos = simpledialog.askinteger("Entrada", "Ingrese la tasa de datos en bps:")
         ancho_banda = simpledialog.askinteger("Entrada", "Ingrese el ancho de banda en Hz:")
         senal = simpledialog.askstring("Entrada", "Ingrese la señal de 8 bits:")
-
-    # Llamar a la función de Fourier con los datos seleccionados o ingresados
     serie_fourier(tasa_datos, ancho_banda, senal)
 
 
-# Ejecutar la función de entrada del usuario
 obtener_entrada_usuario()
