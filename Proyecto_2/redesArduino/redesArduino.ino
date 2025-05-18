@@ -1,16 +1,13 @@
 #include <WiFi.h>
-#include <Wire.h>
-#include <LiquidCrystal_I2C.h>
 #include <PubSubClient.h>
 
+// WiFi
 const char* ssid = "SMN";
 const char* password = "12345678";
 const char* mqtt_broker = "broker.emqx.io";
 const int mqtt_port = 1883;
 WiFiClient espClient;
 PubSubClient client(espClient);
-
-LiquidCrystal_I2C lcd(0x27, 16, 2);
 
 // Pines
 const int BUZZER = 33;
@@ -41,34 +38,22 @@ void setup() {
   pinMode(LED_AMARILLO, OUTPUT);
   pinMode(BOTON, INPUT_PULLUP);
 
-  Wire.begin(21, 22);
-  lcd.init();
-  lcd.backlight();
-  lcd.setCursor(0, 0);
-  lcd.print("Iniciando...");
-
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
-  lcd.setCursor(0, 1);
-  lcd.print("WiFi...");
+  Serial.print("Conectando a WiFi");
   int intentos = 0;
   while (WiFi.status() != WL_CONNECTED && intentos < 20) {
     delay(500);
     Serial.print(".");
-    lcd.print(".");
     intentos++;
   }
 
-  lcd.clear();
   if (WiFi.status() == WL_CONNECTED) {
-    lcd.setCursor(0, 0);
-    lcd.print("WiFi conectado");
-    Serial.println("WiFi conectado");
+    Serial.println("\n✅ WiFi conectado");
     Serial.print("IP: ");
     Serial.println(WiFi.localIP());
   } else {
-    lcd.print("Fallo WiFi");
-    Serial.println("Fallo WiFi");
+    Serial.println("\n❌ Fallo WiFi");
     return;
   }
 
@@ -87,7 +72,7 @@ void loop() {
     monedaActiva = (monedaActiva == "btc") ? "sol" : "btc";
     resuscribirse();
     botonPresionado = true;
-    Serial.println("Moneda cambiada a: " + monedaActiva);
+    Serial.println("🔁 Moneda cambiada a: " + monedaActiva);
   }
 
   if (digitalRead(BOTON) == HIGH) {
@@ -100,7 +85,7 @@ void loop() {
   if (buzzerActivo && millis() - inicioBuzzer >= duracionAlarma * 1000) {
     digitalWrite(BUZZER, LOW);
     buzzerActivo = false;
-    Serial.println("Buzzer apagado");
+    Serial.println("🔕 Buzzer apagado");
   }
 
   if (ultimoPrecio < umbralMin) {
@@ -115,7 +100,7 @@ void loop() {
       digitalWrite(BUZZER, HIGH);
       inicioBuzzer = millis();
       buzzerActivo = true;
-      Serial.println("Buzzer activado");
+      Serial.println("🚨 Buzzer activado");
     }
   } else {
     digitalWrite(LED_ROJO, LOW);
@@ -129,11 +114,11 @@ void loop() {
 void conectarMQTT() {
   String clientId = "ESP32Monitor-" + String(WiFi.macAddress());
   if (client.connect(clientId.c_str())) {
-    Serial.println("MQTT conectado");
+    Serial.println("✅ MQTT conectado");
     client.subscribe("config/monitor01");
     resuscribirse();
   } else {
-    Serial.print("Error MQTT: ");
+    Serial.print("❌ Error MQTT: ");
     Serial.println(client.state());
   }
 }
@@ -142,7 +127,7 @@ void resuscribirse() {
   client.unsubscribe("crypto/btc");
   client.unsubscribe("crypto/sol");
   client.subscribe(("crypto/" + monedaActiva).c_str());
-  Serial.println("Suscrito a: crypto/" + monedaActiva);
+  Serial.println("📡 Suscrito a: crypto/" + monedaActiva);
 }
 
 void callbackMQTT(char* topic, byte* payload, unsigned int length) {
@@ -152,29 +137,27 @@ void callbackMQTT(char* topic, byte* payload, unsigned int length) {
 
   if (topico.startsWith("crypto/")) {
     ultimoPrecio = mensaje.toFloat();
-    Serial.printf("Precio recibido (%s): %f\n", monedaActiva.c_str(), ultimoPrecio);
-
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("Moneda: " + monedaActiva);
-    lcd.setCursor(0, 1);
-    lcd.print("Precio: ");
-    lcd.print(ultimoPrecio);
+    Serial.printf("📩 Precio (%s): %.5f\n", monedaActiva.c_str(), ultimoPrecio);
   }
 
   if (topico == "config/monitor01") {
     int p1 = mensaje.indexOf(',');
     int p2 = mensaje.indexOf(',', p1 + 1);
+    int p3 = mensaje.indexOf(',', p2 + 1);
+
     String moneda = mensaje.substring(0, p1);
-    float nuevoUmbral = mensaje.substring(p1 + 1, p2).toFloat();
-    duracionAlarma = mensaje.substring(p2 + 1).toInt();
+    float nuevoMin = mensaje.substring(p1 + 1, p2).toFloat();
+    float nuevoMax = mensaje.substring(p2 + 1, p3).toFloat();
+    duracionAlarma = mensaje.substring(p3 + 1).toInt();
 
     if (moneda == "btc") {
-      umbralMax_btc = nuevoUmbral;
-      Serial.println("Config BTC actualizada. UmbralMax: " + String(umbralMax_btc));
+      umbralMin_btc = nuevoMin;
+      umbralMax_btc = nuevoMax;
+      Serial.printf("⚙️ Config BTC: min = %.5f, max = %.5f, alarma = %ds\n", umbralMin_btc, umbralMax_btc, duracionAlarma);
     } else if (moneda == "sol") {
-      umbralMax_sol = nuevoUmbral;
-      Serial.println("Config SOL actualizada. UmbralMax: " + String(umbralMax_sol));
+      umbralMin_sol = nuevoMin;
+      umbralMax_sol = nuevoMax;
+      Serial.printf("⚙️ Config SOL: min = %.5f, max = %.5f, alarma = %ds\n", umbralMin_sol, umbralMax_sol, duracionAlarma);
     }
   }
 }

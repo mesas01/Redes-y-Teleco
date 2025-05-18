@@ -8,23 +8,28 @@ public class Configurador {
         String clientId = "JavaConfigClient";
         String topic = "config/monitor01";
 
-        // Aunque se enviará, el ESP32 ya usa el estado del switch
-        String monedaDummy = "btc";        // Solo por formato
-        float umbral = 102974.0f;           // Precio mínimo para activar buzzer
-        int duracion = 5;                  // Duración del buzzer en segundos
+        // definir la configuración deseada
+        String moneda = "btc";         // o "sol"
+        float umbralMin = 104550.0f;    // umbral inferior
+        float umbralMax = 104600.0f;    // umbral superior
+        int duracion = 5;              // duración del buzzer
 
-        String payload = monedaDummy + "," + umbral + "," + duracion;
+        // mensaje en el formato requerido por el ESP32
+        String payload = moneda + "," + umbralMin + "," + umbralMax + "," + duracion;
 
         try {
+            // Crear cliente MQTT
             MqttClient client = new MqttClient(broker, clientId);
             MqttConnectOptions options = new MqttConnectOptions();
             options.setCleanSession(true);
 
+            // Conectar al broker
             client.connect(options);
             System.out.println("Conectado a broker MQTT");
 
+            // Publicar el mensaje
             MqttMessage message = new MqttMessage(payload.getBytes());
-            message.setQos(0);
+            message.setQos(0); // QoS 0: sin garantía de entrega
             client.publish(topic, message);
 
             System.out.println("Configuración enviada a " + topic + ": " + payload);
