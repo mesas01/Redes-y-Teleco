@@ -49,7 +49,7 @@ public class SensorMonedas {
 
     // Esta función se encarga de obtener el precio de una criptomoneda desde Binance y publicarlo en un tópico MQTT
     public static void publishPrice(MqttClient client, String symbol, String topic) {
-        String price = getBinancePrice(symbol); // Obtengo el precio actual desde Binance
+        String price = getBinancePrice(symbol); // Obtengo el precio actual desde Binance (funcion mas abajo)
 
         if (price != null) {
             try {
